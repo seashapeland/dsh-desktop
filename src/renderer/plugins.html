@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <title>Plugin Center</title>
+    <style>
+      :root { color-scheme: light; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; --bg:#fff; --layer:#f7f8f9; --label:#0f1115; --secondary:#61666b; --tertiary:#81858c; --border:rgba(15,17,21,.09); --accent:#3964fe; --button:#0f1115; --button-label:#fff; background:var(--bg); color:var(--label); }
+      :root[data-desktop-theme="dark"] { color-scheme: dark; --bg:#151517; --layer:#232325; --label:#f4f5f6; --secondary:#b9bcc1; --tertiary:#8e9298; --border:rgba(255,255,255,.08); --accent:#6f91ff; --button:#f4f5f6; --button-label:#151517; }
+      * { box-sizing: border-box; } body { margin: 0; padding-top:36px; background:var(--bg); color:var(--label); } .window-bar { position:fixed; inset:0 0 auto; z-index:10; height:36px; display:flex; align-items:center; padding:0 144px 0 14px; border-bottom:1px solid var(--border); background:var(--bg); color:var(--tertiary); font-size:12px; -webkit-app-region:drag; } main { padding: 34px; }
+      header { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 23px; }
+      h1 { margin: 0; font-size: 25px; letter-spacing: -.4px; } .badge { color: var(--accent); font: 600 11px/1 ui-monospace, Consolas, monospace; letter-spacing: .08em; }
+      .intro { color: var(--secondary); line-height: 1.65; margin: 18px 0 18px; }
+      .risk { margin: 0 0 25px; padding-left: 12px; border-left: 2px solid var(--accent); color: var(--tertiary); font-size: 12px; line-height: 1.6; }
+      form { display: flex; gap: 9px; padding-bottom: 26px; border-bottom: 1px solid var(--border); }
+      input { flex: 1; min-width: 0; color: var(--label); background: var(--layer); border: 1px solid var(--border); border-radius: 8px; padding: 11px 12px; font: 14px ui-monospace, Consolas, monospace; outline: none; }
+      input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent); } button { border: 0; border-radius: 18px; padding: 0 16px; color: var(--button-label); background: var(--button); cursor: pointer; font-weight: 700; } button:hover { opacity:.88; } button:disabled { cursor: wait; opacity: .55; }
+      h2 { margin: 27px 0 11px; font-size: 13px; color: var(--secondary); font-weight: 600; text-transform: uppercase; letter-spacing: .07em; }
+      ul { list-style: none; padding: 0; margin: 0; } li { display: flex; align-items: center; justify-content: space-between; min-height: 47px; border-bottom: 1px solid var(--border); } code { color: var(--label); font: 13px ui-monospace, Consolas, monospace; } .remove { color: #d34f56; background: transparent; padding: 7px 9px; font-size: 12px; } .remove:hover { color: #d34f56; background: color-mix(in srgb,#d34f56 12%,transparent); }
+      .empty { color: var(--tertiary); padding: 20px 0; } .status { min-height: 22px; margin: 15px 0 0; color: #398b63; font-size: 13px; } .status.error { color: #d34f56; }
+      footer { margin-top: 28px; color: var(--tertiary); font-size: 12px; line-height: 1.55; }
+    </style>
+  </head>
+  <body>
+    <div class="window-bar">DSH Desktop · 插件</div>
+    <main>
+      <header><h1>Plugin Center</h1><span class="badge">DSH PROFILE · WEB</span></header>
+      <p class="intro">以 DSH 官方的 <code>web</code> profile 安装 npm 插件。安装或移除后，桌面端会自动重启 DSH，让新插件生效。</p>
+      <p class="risk">插件与 DSH 后端拥有相同的本机权限，可能读取工作区或执行命令。只安装你确认来源可信的 npm 包。</p>
+      <form id="install-form"><input id="package-name" autocomplete="off" placeholder="@scope/dsh-plugin-example" aria-label="npm 插件包名" /><button id="install" type="submit">安装</button></form>
+      <p id="status" class="status" aria-live="polite"></p>
+      <h2>由 DSH Desktop 安装</h2><ul id="plugin-list"></ul>
+      <footer>只管理从此窗口安装的插件，以保护 DSH 的内置 bundle 和你通过其他方式维护的 profile 配置。</footer>
+    </main>
+    <script>
+      const api = window.desktopPlugins
+      const form = document.getElementById('install-form')
+      const input = document.getElementById('package-name')
+      const status = document.getElementById('status')
+      const list = document.getElementById('plugin-list')
+      const installButton = document.getElementById('install')
+      const setStatus = (message, error = false) => { status.textContent = message; status.className = error ? 'status error' : 'status' }
+      const setBusy = (busy) => { input.disabled = busy; installButton.disabled = busy; installButton.textContent = busy ? '处理中…' : '安装' }
+      async function render() {
+        const state = await api.list()
+        list.replaceChildren()
+        if (!state.installed.length) { list.innerHTML = '<li class="empty">尚未安装桌面端管理的插件。</li>'; return }
+        for (const name of state.installed) {
+          const item = document.createElement('li')
+          const packageName = document.createElement('code'); packageName.textContent = name
+          const remove = document.createElement('button'); remove.className = 'remove'; remove.textContent = '移除'
+          remove.onclick = async () => { if (!confirm(`移除 ${name}？\n\n移除后 DSH 会自动重启，正在运行的任务会被终止。`)) return; setBusy(true); setStatus(`正在移除 ${name}…`); try { await api.remove(name); setStatus(`${name} 已移除，DSH 已重启。`); await render() } catch (error) { setStatus(error.message || String(error), true) } finally { setBusy(false) } }
+          item.append(packageName, remove); list.append(item)
+        }
+      }
+      form.addEventListener('submit', async (event) => { event.preventDefault(); const name = input.value.trim(); if (!name) return; if (!confirm(`安装 ${name}？\n\n该 npm 插件将获得与 DSH 后端相同的本机权限，安装完成会自动重启 DSH（正在运行的任务会被终止）。请确认你信任它的作者和发布来源。`)) return; setBusy(true); setStatus(`正在安装 ${name}…`); try { await api.install(name); input.value = ''; setStatus(`${name} 已安装，DSH 已重启。`); await render() } catch (error) { setStatus(error.message || String(error), true) } finally { setBusy(false) } })
+      render().catch((error) => setStatus(error.message || String(error), true))
+    </script>
+  </body>
+</html>

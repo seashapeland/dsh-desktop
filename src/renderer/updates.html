@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <title>DSH Desktop 更新</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        --bg: #ffffff;
+        --layer: #f7f8f9;
+        --label: #0f1115;
+        --secondary: #61666b;
+        --tertiary: #81858c;
+        --border: rgba(15, 17, 21, .09);
+        --hover: rgba(15, 17, 21, .055);
+        --accent: #3964fe;
+        --button: #0f1115;
+        --button-hover: #2b2e33;
+        --button-label: #ffffff;
+        background: var(--bg);
+        color: var(--label);
+      }
+      :root[data-desktop-theme="dark"] {
+        color-scheme: dark;
+        --bg: #151517;
+        --layer: #232325;
+        --label: #f4f5f6;
+        --secondary: #b9bcc1;
+        --tertiary: #8e9298;
+        --border: rgba(255, 255, 255, .08);
+        --hover: rgba(255, 255, 255, .08);
+        --accent: #6f91ff;
+        --button: #f4f5f6;
+        --button-hover: #ffffff;
+        --button-label: #151517;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-desktop-theme]) {
+          color-scheme: dark; --bg: #151517; --layer: #232325; --label: #f4f5f6; --secondary: #b9bcc1;
+          --tertiary: #8e9298; --border: rgba(255, 255, 255, .08); --hover: rgba(255, 255, 255, .08);
+          --accent: #6f91ff; --button: #f4f5f6; --button-hover: #ffffff; --button-label: #151517;
+        }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; padding-top: 36px; background: var(--bg); transition: background-color .16s ease, color .16s ease; }
+      .window-bar { position: fixed; inset: 0 0 auto; z-index: 10; height: 36px; display: flex; align-items: center; padding: 0 144px 0 14px; border-bottom: 1px solid var(--border); background: var(--bg); color: var(--tertiary); font-size: 12px; -webkit-app-region: drag; }
+      .window-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      main { padding: 39px 42px 34px; animation: arrive .2s ease-out both; }
+      header { padding-bottom: 27px; border-bottom: 1px solid var(--border); }
+      .eyebrow { display: flex; align-items: center; gap: 8px; margin: 0 0 11px; color: var(--tertiary); font-size: 12px; line-height: 18px; }
+      .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tertiary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tertiary) 12%, transparent); }
+      body[data-phase="available"] .status-dot, body[data-phase="downloading"] .status-dot { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+      h1 { margin: 0; font-size: 24px; line-height: 32px; font-weight: 600; letter-spacing: -.35px; }
+      #summary { margin: 9px 0 0; max-width: 480px; color: var(--secondary); font-size: 14px; line-height: 22px; }
+      .versions { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; padding: 23px 0; border-bottom: 1px solid var(--border); }
+      .label { display: block; margin-bottom: 7px; color: var(--tertiary); font-size: 12px; line-height: 18px; }
+      .value { font: 600 14px/20px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: -.1px; }
+      #notes { min-height: 87px; margin: 0; padding: 22px 0; color: var(--secondary); font-size: 13px; line-height: 21px; white-space: pre-wrap; }
+      .progress { height: 2px; overflow: hidden; border-radius: 1px; background: var(--layer); opacity: 0; transition: opacity .16s ease; }
+      .progress.active { opacity: 1; }
+      .progress > span { display: block; width: 0; height: 100%; background: var(--accent); transition: width .16s linear; }
+      footer { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-top: 23px; }
+      #detail { margin: 0; color: var(--tertiary); font-size: 12px; line-height: 18px; }
+      button { flex: none; min-width: 116px; height: 36px; border: 0; border-radius: 18px; padding: 0 17px; background: var(--button); color: var(--button-label); font: 600 13px/1 inherit; cursor: pointer; transition: background-color .14s ease, opacity .14s ease, transform .14s ease; }
+      button:hover:not(:disabled) { background: var(--button-hover); transform: translateY(-1px); }
+      button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      button:disabled { cursor: default; opacity: .42; }
+      @keyframes arrive { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+      @media (prefers-reduced-motion: reduce) { body, main, button, .progress, .progress > span { animation: none; transition: none; } }
+    </style>
+  </head>
+  <body>
+    <div class="window-bar"><span>DSH Desktop · 更新</span></div>
+    <main>
+      <header><p class="eyebrow"><span class="status-dot"></span><span>桌面端更新</span></p><h1 id="title">检查更新</h1><p id="summary">正在读取经过签名的桌面端发布清单。</p></header>
+      <section class="versions"><div><span class="label">桌面端</span><span id="desktop-version" class="value">—</span></div><div><span class="label">DeepSeek Harness</span><span id="dsh-version" class="value">—</span></div></section>
+      <p id="notes">更新只会在 DSH 兼容性测试通过后发布，不会直接替换 npm 运行时。</p>
+      <div id="progress" class="progress"><span></span></div>
+      <footer><p id="detail"></p><button id="action" type="button">检查更新</button></footer>
+    </main>
+    <script>
+      const api = window.desktopUpdater
+      const title = document.getElementById('title')
+      const summary = document.getElementById('summary')
+      const desktopVersion = document.getElementById('desktop-version')
+      const dshVersion = document.getElementById('dsh-version')
+      const notes = document.getElementById('notes')
+      const detail = document.getElementById('detail')
+      const action = document.getElementById('action')
+      const progress = document.getElementById('progress')
+      const progressBar = progress.firstElementChild
+
+      function render(state) {
+        document.body.dataset.phase = state.phase || 'idle'
+        desktopVersion.textContent = state.available?.desktopVersion || state.currentVersion || '—'
+        dshVersion.textContent = state.available?.dshVersion || state.currentDshVersion || '—'
+        notes.textContent = state.available?.notes || '更新只会在 DSH 兼容性测试通过后发布，不会直接替换 npm 运行时。'
+        detail.textContent = state.detail || ''
+        progress.classList.toggle('active', state.phase === 'downloading')
+        progressBar.style.width = `${state.progress || 0}%`
+        action.disabled = state.phase === 'checking' || state.phase === 'downloading'
+        if (state.phase === 'available') { title.textContent = '发现兼容更新'; summary.textContent = '新版已通过桌面端兼容性检查，可以先下载 MSI。'; action.textContent = '下载安装包' }
+        else if (state.phase === 'downloaded') { title.textContent = '安装包已验证'; summary.textContent = 'MSI 已完成签名清单和 SHA-256 校验。'; action.textContent = '在文件夹中显示'; action.disabled = false }
+        else if (state.phase === 'up-to-date') { title.textContent = '已是最新版本'; summary.textContent = '当前桌面端与已验证的 DSH 版本保持同步。'; action.textContent = '再次检查'; action.disabled = false }
+        else if (state.phase === 'unavailable') { title.textContent = '更新服务尚未启用'; summary.textContent = '发布地址和签名公钥配置完成后，这里会提供安全更新。'; action.textContent = '重新检查'; action.disabled = false }
+        else if (state.phase === 'error') { title.textContent = '无法检查更新'; summary.textContent = '本次检查没有更改任何本地文件。'; action.textContent = '重试'; action.disabled = false }
+        else if (state.phase === 'downloading') { title.textContent = '正在下载安装包'; summary.textContent = '下载结束后会先校验完整性，不会自动运行。'; action.textContent = `${Math.round(state.progress || 0)}%` }
+        else { title.textContent = '检查更新'; summary.textContent = '正在读取经过签名的桌面端发布清单。'; action.textContent = '检查更新' }
+      }
+
+      action.addEventListener('click', async () => {
+        const state = await api.status()
+        if (state.phase === 'available') await api.download()
+        else if (state.phase === 'downloaded') await api.reveal()
+        else await api.check()
+      })
+      api.onStatus(render)
+      api.status().then(render).then(() => api.check()).catch((error) => render({ phase: 'error', detail: error.message || String(error) }))
+    </script>
+  </body>
+</html>

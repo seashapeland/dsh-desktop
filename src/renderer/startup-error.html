@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <title>DSH 未能启动</title>
+    <style>
+      :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #151517; color: #f9fafb; }
+      body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #151517; }
+      main { width: min(620px, calc(100% - 48px)); }
+      h1 { margin: 0; font-size: 24px; } p { color: #a7b2bd; line-height: 1.65; } pre { max-height: 270px; overflow: auto; padding: 16px; background: #161d25; border: 1px solid #2c3946; border-radius: 8px; color: #f0b6b1; white-space: pre-wrap; font: 12px/1.55 ui-monospace, Consolas, monospace; }
+      small { color: #6f8090; }
+    </style>
+  </head>
+  <body><main><h1>DSH 后端未能启动</h1><p>请从 <strong>DSH Desktop → 重启 DSH 后端</strong> 再试。若问题持续，请使用“帮助 → 打开应用数据目录”查看 DSH 配置。</p><pre id="message"></pre><small>首次启动会下载并初始化 DSH profile，可能需要稍候。</small><script>document.getElementById('message').textContent = new URLSearchParams(location.search).get('message') || '未提供错误详情。'</script></main></body>
+</html>

@@ -1,0 +1,16 @@
+# Dependencies and build output
+node_modules/
+dist/
+release/
+output/
+
+# Local preview and test artifacts
+.preview-data/
+.runtime-test/
+.runtime-tests/
+.package-smoke/
+.build-cache/
+.build-cache-*/
+
+# Logs
+*.log

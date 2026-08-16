@@ -1,0 +1,92 @@
+{
+  "name": "dsh-desktop",
+  "version": "0.1.4",
+  "description": "Windows desktop host for DeepSeek Harness",
+  "private": true,
+  "main": "dist/main/index.js",
+  "scripts": {
+    "patch:dsh-picker": "node scripts/patch-dsh-directory-picker.mjs",
+    "postinstall": "node scripts/patch-dsh-directory-picker.mjs",
+    "build": "npm run patch:dsh-picker && tsc -p tsconfig.json",
+    "clean": "node scripts/clean.mjs",
+    "test:update": "npm run build && node scripts/test-update-manifest.mjs",
+    "preview": "npm run build && node scripts/preview.mjs",
+    "preview:safe": "npm run build && node scripts/preview.mjs --isolated",
+    "preview:update": "npm run build && node scripts/preview.mjs --isolated --open-update-window",
+    "start": "npm run build && electron .",
+    "dist:win": "npm run build && electron-builder --win msi --x64"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/cordis-plugin-group": "1.0.1",
+    "@deepseek-ai/cordis-plugin-hmr": "1.0.16",
+    "@deepseek-ai/cordis-plugin-include": "1.0.6",
+    "@deepseek-ai/cordis-plugin-loader": "1.0.2",
+    "@deepseek-ai/dsh": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-anonymous-user-id": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-atomic-write": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-bash-local": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-code-runtime": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-compaction": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-fs": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-home-paths": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-invariants": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-launch-environment": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-output-retention": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-sandbox": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-scope": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-session-telemetry": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-session-title-llm": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-shell": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-spill": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-subagent-in-process-driver": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-subprocess": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-system-prompt": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-timeout": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-workflow": "0.1.0-rc.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "electron": "^39.0.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.8.3"
+  },
+  "desktopUpdate": {
+    "manifestUrl": "",
+    "publicKey": ""
+  },
+  "build": {
+    "appId": "ai.deepseek.dshdesktop",
+    "productName": "DSH Desktop",
+    "icon": "build/icon.svg",
+    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "src/renderer/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "electronFuses": {
+      "runAsNode": true
+    },
+    "asarUnpack": [
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        "msi"
+      ]
+    },
+    "msi": {
+      "oneClick": false,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "upgradeCode": "{E2E52BB9-6D8F-4E50-B7A1-58A78D322147}"
+    }
+  }
+}

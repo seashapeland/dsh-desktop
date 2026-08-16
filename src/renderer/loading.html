@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'" />
+    <title>正在启动 DSH Desktop</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: #151517;
+        color: #f9fafb;
+      }
+      * { box-sizing: border-box; }
+      body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #151517; }
+      main { width: 240px; text-align: center; animation: arrive .42s cubic-bezier(.2,.8,.2,1) both; }
+      .mark { width: 40px; height: 40px; display: block; margin: 0 auto 18px; filter: invert(1); opacity: .68; animation: breathe 2.4s ease-in-out infinite; }
+      h1 { margin: 0; font-size: 17px; line-height: 24px; font-weight: 600; letter-spacing: -.2px; }
+      p { margin: 7px 0 0; color: #979da6; font-size: 13px; line-height: 20px; }
+      .progress { width: 112px; height: 1px; margin: 24px auto 0; overflow: hidden; background: rgba(255,255,255,.08); }
+      .progress::after { content: ""; display: block; width: 38px; height: 100%; background: #5686fe; animation: travel 1.35s cubic-bezier(.4,0,.2,1) infinite; }
+      @keyframes arrive { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes breathe { 0%,100% { opacity: .58; } 50% { opacity: .82; } }
+      @keyframes travel { from { transform: translateX(-42px); } to { transform: translateX(116px); } }
+      @media (prefers-reduced-motion: reduce) { main, .mark, .progress::after { animation: none; } }
+    </style>
+  </head>
+  <body><main><img class="mark" src="./assets/favicon.svg" alt="" /><h1>DeepSeek Harness</h1><p>正在启动本地运行时</p><div class="progress"></div></main></body>
+</html>
