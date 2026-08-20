@@ -162,7 +162,7 @@ export async function downloadUpdate(
   onProgress: (progress: DownloadProgress) => void
 ): Promise<string> {
   await mkdir(destinationDirectory, { recursive: true })
-  const finalPath = path.join(destinationDirectory, `DSH Desktop-Setup-${payload.desktopVersion}.msi`)
+  const finalPath = path.join(destinationDirectory, `DSH-Desktop-Setup-${payload.desktopVersion}.msi`)
   const temporaryPath = `${finalPath}.partial`
   await rm(temporaryPath, { force: true })
 

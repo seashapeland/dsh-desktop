@@ -14,7 +14,7 @@ const desktopVersion = desktopPackage.version
 const dshVersion = desktopPackage.dshRuntime?.version
 if (!versionPattern.test(desktopVersion) || !versionPattern.test(dshVersion)) throw new Error('桌面端或 DSH runtime 版本无效。')
 
-const assetName = `DSH Desktop-Setup-${desktopVersion}.msi`
+const assetName = `DSH-Desktop-Setup-${desktopVersion}.msi`
 const msiPath = path.join(projectRoot, 'release', assetName)
 const msiBytes = await readFile(msiPath)
 const msiStat = await stat(msiPath)

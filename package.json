@@ -1,6 +1,6 @@
 {
   "name": "dsh-desktop",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Windows desktop host for DeepSeek Harness",
   "private": true,
   "main": "dist/main/index.js",
@@ -42,7 +42,7 @@
     "appId": "ai.deepseek.dshdesktop",
     "productName": "DSH Desktop",
     "icon": "build/icon.svg",
-    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "artifactName": "DSH-Desktop-Setup-${version}.${ext}",
     "directories": {
       "output": "release"
     },
