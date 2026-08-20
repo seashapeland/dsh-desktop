@@ -1,0 +1,56 @@
+{
+  "name": "dsh-deepseek-balance",
+  "version": "0.2.0",
+  "description": "DeepSeek usage & balance inside DSH, modeled on the official platform page: recharged balance with availability, spend/requests/tokens rows, per-model breakdown, and one-click links to platform.deepseek.com. Works with the official `dsh web` (browser) and desktop wrappers alike.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/client.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  },
+  "files": [
+    "lib",
+    "scripts/install-desktop.ps1",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "node --check lib/index.js && node --check lib/client.js && node scripts/smoke-client.mjs && node scripts/smoke-host.mjs",
+    "test:e2e": "node scripts/boot-minimal.mjs"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-credentials": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-host-webserver": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "react": "^18.2.0"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "deepseek",
+    "balance",
+    "billing",
+    "plugin"
+  ],
+  "license": "MIT"
+}

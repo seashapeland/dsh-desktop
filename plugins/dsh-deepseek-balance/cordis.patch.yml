@@ -1,0 +1,16 @@
+# dsh-deepseek-balance bundle patch: mount the host half as one loader row.
+#
+# This patch list is applied over the profile's composed tree (after
+# dsh-base and dsh-web-app), so a top-level `insert` simply adds the row.
+# The row's package name is what the loader imports; the package's
+# `dsh.client` declaration (see package.json) makes the browser half
+# available through the same row.
+
+- insert:
+    - id: deepseek-balance
+      name: dsh-deepseek-balance
+      # Optional overrides (all keys optional):
+      # config:
+      #   baseUrl: https://api.deepseek.com
+      #   apiKeyRef: DEEPSEEK_API_KEY
+      #   route: /dsh-deepseek-balance

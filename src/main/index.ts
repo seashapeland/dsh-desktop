@@ -2,10 +2,10 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell } from 'elect
 import { ChildProcess, spawn } from 'node:child_process'
 import { createServer } from 'node:net'
 import { appendFile, copyFile, lstat, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { compareVersions, downloadUpdate, fetchUpdateManifest, UpdatePayload } from './update'
+import { compareVersions, downloadUpdate, fetchOfficialDshRelease, fetchUpdateManifest, UpdatePayload } from './update'
 
 type PluginState = {
   installed: string[]
@@ -29,7 +29,8 @@ const LOG_BACKUPS = 3
 
 type DesktopPackage = {
   dependencies?: Record<string, string>
-  desktopUpdate?: { manifestUrl?: string; publicKey?: string }
+  dshRuntime?: { version?: string }
+  desktopUpdate?: { repository?: string; manifestUrl?: string; publicKey?: string; publicKeyFile?: string }
 }
 
 type SkillRecord = {
@@ -40,9 +41,11 @@ type SkillRecord = {
 }
 
 type UpdateState = {
-  phase: 'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'downloaded' | 'unavailable' | 'error'
+  phase: 'idle' | 'checking' | 'up-to-date' | 'dsh-update-available' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'unavailable' | 'error'
   currentVersion: string
   currentDshVersion: string
+  latestDshVersion?: string
+  officialDshPackageUrl?: string
   available?: UpdatePayload
   progress?: number
   detail?: string
@@ -50,7 +53,7 @@ type UpdateState = {
 }
 
 const desktopPackage = require(path.join(app.getAppPath(), 'package.json')) as DesktopPackage
-const currentDshVersion = desktopPackage.dependencies?.['@deepseek-ai/dsh'] ?? 'unknown'
+const currentDshVersion = desktopPackage.dshRuntime?.version ?? desktopPackage.dependencies?.['@deepseek-ai/dsh'] ?? 'unknown'
 let updateState: UpdateState = {
   phase: 'idle',
   currentVersion: app.getVersion(),
@@ -87,12 +90,13 @@ function rendererPath(file: string): string {
 }
 
 function dshCliPath(): string {
-  const cliPath = require.resolve('@deepseek-ai/dsh/lib/bin.js')
-  // DSH creates profile-level junctions for its bundled plugins. Junctions
-  // cannot be resolved through Electron's virtual app.asar filesystem, so the
-  // CLI itself must run from the physical unpacked dependency tree.
-  if (!app.isPackaged) return cliPath
-  return cliPath.replace(/([\\/])app\.asar([\\/])/, '$1app.asar.unpacked$2')
+  if (app.isPackaged) {
+    // Keep the production DSH tree outside app.asar and copy it verbatim. Its
+    // plugin packages use peerDependencies extensively, which electron-builder
+    // otherwise prunes while walking the desktop app dependency graph.
+    return path.join(process.resourcesPath, 'dsh-runtime', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
+  }
+  return require.resolve('@deepseek-ai/dsh/lib/bin.js')
 }
 
 function safeRuntimeText(message: string): string {
@@ -504,9 +508,20 @@ async function removePlugin(event: Electron.IpcMainInvokeEvent, rawName: string)
 }
 
 function updateConfiguration(): { manifestUrl: string; publicKey: string } | null {
-  const manifestUrl = process.env.DSH_DESKTOP_UPDATE_URL?.trim() || desktopPackage.desktopUpdate?.manifestUrl?.trim() || ''
-  const publicKey = (process.env.DSH_DESKTOP_UPDATE_PUBLIC_KEY?.trim() || desktopPackage.desktopUpdate?.publicKey?.trim() || '')
-    .replace(/\\n/g, '\n')
+  const repository = desktopPackage.desktopUpdate?.repository?.trim() || ''
+  const manifestUrl = process.env.DSH_DESKTOP_UPDATE_URL?.trim()
+    || desktopPackage.desktopUpdate?.manifestUrl?.trim()
+    || (repository ? `https://github.com/${repository}/releases/latest/download/update.json` : '')
+  let publicKey = process.env.DSH_DESKTOP_UPDATE_PUBLIC_KEY?.trim() || desktopPackage.desktopUpdate?.publicKey?.trim() || ''
+  const publicKeyFile = desktopPackage.desktopUpdate?.publicKeyFile?.trim()
+  if (!publicKey && publicKeyFile) {
+    try {
+      publicKey = readFileSync(path.join(app.getAppPath(), publicKeyFile), 'utf8').trim()
+    } catch {
+      publicKey = ''
+    }
+  }
+  publicKey = publicKey.replace(/\\n/g, '\n')
   return manifestUrl && publicKey ? { manifestUrl, publicKey } : null
 }
 
@@ -519,29 +534,56 @@ function publishUpdateState(next: UpdateState): UpdateState {
 async function checkForUpdates(): Promise<UpdateState> {
   if (updateState.phase === 'checking' || updateState.phase === 'downloading') return updateState
   const configuration = updateConfiguration()
-  if (!configuration) {
-    return publishUpdateState({
-      phase: 'unavailable',
-      currentVersion: app.getVersion(),
-      currentDshVersion,
-      detail: '尚未配置签名更新源。'
-    })
-  }
-  publishUpdateState({ phase: 'checking', currentVersion: app.getVersion(), currentDshVersion, detail: '正在验证更新清单…' })
+  publishUpdateState({ phase: 'checking', currentVersion: app.getVersion(), currentDshVersion, detail: '正在检查官方 DSH 与桌面端更新…' })
   try {
-    const available = await fetchUpdateManifest(configuration.manifestUrl, configuration.publicKey)
-    if (compareVersions(available.desktopVersion, app.getVersion()) <= 0) {
+    if (!configuration) {
+      const official = await fetchOfficialDshRelease()
+      if (compareVersions(official.version, currentDshVersion) > 0) {
+        return publishUpdateState({
+          phase: 'dsh-update-available',
+          currentVersion: app.getVersion(),
+          currentDshVersion,
+          latestDshVersion: official.version,
+          officialDshPackageUrl: official.packageUrl,
+          detail: '官方 DSH 已发布新版本；桌面端需完成兼容测试后再提供安装包。'
+        })
+      }
       return publishUpdateState({
-        phase: 'up-to-date',
+        phase: 'unavailable',
         currentVersion: app.getVersion(),
         currentDshVersion,
-        detail: `已验证发布版本 ${available.desktopVersion}。`
+        latestDshVersion: official.version,
+        officialDshPackageUrl: official.packageUrl,
+        detail: '官方 DSH 已是最新；桌面端签名更新源尚未配置。'
       })
     }
-    return publishUpdateState({
-      phase: 'available',
+
+    const [officialResult, manifestResult] = await Promise.allSettled([
+      fetchOfficialDshRelease(),
+      fetchUpdateManifest(configuration.manifestUrl, configuration.publicKey)
+    ])
+    if (manifestResult.status === 'rejected') throw manifestResult.reason
+    const available = manifestResult.value
+    const official = officialResult.status === 'fulfilled' ? officialResult.value : null
+    const common = {
       currentVersion: app.getVersion(),
       currentDshVersion,
+      latestDshVersion: official?.version,
+      officialDshPackageUrl: official?.packageUrl
+    }
+    if (compareVersions(available.desktopVersion, app.getVersion()) <= 0) {
+      if (official && compareVersions(official.version, currentDshVersion) > 0) {
+        return publishUpdateState({
+          ...common,
+          phase: 'dsh-update-available',
+          detail: '官方 DSH 已更新，但兼容的桌面端安装包尚未发布。'
+        })
+      }
+      return publishUpdateState({ ...common, phase: 'up-to-date', detail: `已验证桌面端发布版本 ${available.desktopVersion}。` })
+    }
+    return publishUpdateState({
+      ...common,
+      phase: 'available',
       available,
       detail: `发布于 ${new Date(available.publishedAt).toLocaleString('zh-CN')}。`
     })
@@ -550,6 +592,25 @@ async function checkForUpdates(): Promise<UpdateState> {
     await writeRuntimeLog(`Update check failed: ${detail}`)
     return publishUpdateState({ phase: 'error', currentVersion: app.getVersion(), currentDshVersion, detail })
   }
+}
+
+async function installDownloadedUpdate(): Promise<UpdateState> {
+  if (updateState.phase !== 'downloaded' || !updateState.downloadPath) return updateState
+  const target = path.resolve(updateState.downloadPath)
+  const updateRoot = path.resolve(path.join(app.getPath('temp'), 'dsh-desktop-updates'))
+  const relative = path.relative(updateRoot, target)
+  if (relative.startsWith('..') || path.isAbsolute(relative) || path.extname(target).toLowerCase() !== '.msi' || !existsSync(target)) {
+    return publishUpdateState({ ...updateState, phase: 'error', detail: '已验证的 MSI 安装包不存在，请重新下载。' })
+  }
+  const errorMessage = await shell.openPath(target)
+  if (errorMessage) {
+    return publishUpdateState({ ...updateState, phase: 'error', detail: `无法启动安装程序：${safeRuntimeText(errorMessage)}` })
+  }
+  return publishUpdateState({
+    ...updateState,
+    phase: 'installing',
+    detail: '安装程序已启动。升级时请按提示关闭 DSH Desktop。'
+  })
 }
 
 async function downloadAvailableUpdate(): Promise<UpdateState> {
@@ -845,6 +906,10 @@ if (!gotLock) {
       requireUpdateWindow(event)
       return downloadAvailableUpdate()
     })
+    ipcMain.handle('updates:install', async (event) => {
+      requireUpdateWindow(event)
+      return installDownloadedUpdate()
+    })
     ipcMain.handle('updates:reveal', async (event) => {
       requireUpdateWindow(event)
       if (!updateState.downloadPath || !existsSync(updateState.downloadPath)) {
@@ -861,10 +926,10 @@ if (!gotLock) {
     })
     createMainWindow()
     if (process.argv.includes('--open-update-window')) openUpdateWindow()
-    if (app.isPackaged && updateConfiguration()) {
+    if (app.isPackaged) {
       setTimeout(() => {
         void checkForUpdates().then((state) => {
-          if (state.phase === 'available') openUpdateWindow()
+          if (state.phase === 'available' || state.phase === 'dsh-update-available') openUpdateWindow()
         })
       }, 12_000)
     }

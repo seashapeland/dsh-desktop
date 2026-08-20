@@ -52,12 +52,12 @@
       header { padding-bottom: 27px; border-bottom: 1px solid var(--border); }
       .eyebrow { display: flex; align-items: center; gap: 8px; margin: 0 0 11px; color: var(--tertiary); font-size: 12px; line-height: 18px; }
       .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tertiary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tertiary) 12%, transparent); }
-      body[data-phase="available"] .status-dot, body[data-phase="downloading"] .status-dot { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+      body[data-phase="available"] .status-dot, body[data-phase="dsh-update-available"] .status-dot, body[data-phase="downloading"] .status-dot { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
       h1 { margin: 0; font-size: 24px; line-height: 32px; font-weight: 600; letter-spacing: -.35px; }
       #summary { margin: 9px 0 0; max-width: 480px; color: var(--secondary); font-size: 14px; line-height: 22px; }
-      .versions { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; padding: 23px 0; border-bottom: 1px solid var(--border); }
+      .versions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; padding: 23px 0; border-bottom: 1px solid var(--border); }
       .label { display: block; margin-bottom: 7px; color: var(--tertiary); font-size: 12px; line-height: 18px; }
-      .value { font: 600 14px/20px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: -.1px; }
+      .value { display: block; overflow: hidden; color: var(--label); font: 600 13px/20px ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: -.1px; text-overflow: ellipsis; white-space: nowrap; }
       #notes { min-height: 87px; margin: 0; padding: 22px 0; color: var(--secondary); font-size: 13px; line-height: 21px; white-space: pre-wrap; }
       .progress { height: 2px; overflow: hidden; border-radius: 1px; background: var(--layer); opacity: 0; transition: opacity .16s ease; }
       .progress.active { opacity: 1; }
@@ -76,8 +76,8 @@
     <div class="window-bar"><span>DSH Desktop · 更新</span></div>
     <main>
       <header><p class="eyebrow"><span class="status-dot"></span><span>桌面端更新</span></p><h1 id="title">检查更新</h1><p id="summary">正在读取经过签名的桌面端发布清单。</p></header>
-      <section class="versions"><div><span class="label">桌面端</span><span id="desktop-version" class="value">—</span></div><div><span class="label">DeepSeek Harness</span><span id="dsh-version" class="value">—</span></div></section>
-      <p id="notes">更新只会在 DSH 兼容性测试通过后发布，不会直接替换 npm 运行时。</p>
+      <section class="versions"><div><span class="label">当前桌面端</span><span id="desktop-version" class="value">—</span></div><div><span class="label">内置 DSH</span><span id="dsh-version" class="value">—</span></div><div><span class="label">官方最新 DSH</span><span id="official-dsh-version" class="value">—</span></div></section>
+      <p id="notes">官方 DSH 更新会先经过桌面端兼容测试，再随签名 MSI 一起发布。</p>
       <div id="progress" class="progress"><span></span></div>
       <footer><p id="detail"></p><button id="action" type="button">检查更新</button></footer>
     </main>
@@ -87,6 +87,7 @@
       const summary = document.getElementById('summary')
       const desktopVersion = document.getElementById('desktop-version')
       const dshVersion = document.getElementById('dsh-version')
+      const officialDshVersion = document.getElementById('official-dsh-version')
       const notes = document.getElementById('notes')
       const detail = document.getElementById('detail')
       const action = document.getElementById('action')
@@ -95,26 +96,30 @@
 
       function render(state) {
         document.body.dataset.phase = state.phase || 'idle'
-        desktopVersion.textContent = state.available?.desktopVersion || state.currentVersion || '—'
-        dshVersion.textContent = state.available?.dshVersion || state.currentDshVersion || '—'
-        notes.textContent = state.available?.notes || '更新只会在 DSH 兼容性测试通过后发布，不会直接替换 npm 运行时。'
+        desktopVersion.textContent = state.available ? `${state.currentVersion} → ${state.available.desktopVersion}` : state.currentVersion || '—'
+        dshVersion.textContent = state.currentDshVersion || '—'
+        officialDshVersion.textContent = state.latestDshVersion || '检测中'
+        notes.textContent = state.available?.notes || '官方 DSH 更新会先经过桌面端兼容测试，再随签名 MSI 一起发布。'
         detail.textContent = state.detail || ''
         progress.classList.toggle('active', state.phase === 'downloading')
         progressBar.style.width = `${state.progress || 0}%`
         action.disabled = state.phase === 'checking' || state.phase === 'downloading'
         if (state.phase === 'available') { title.textContent = '发现兼容更新'; summary.textContent = '新版已通过桌面端兼容性检查，可以先下载 MSI。'; action.textContent = '下载安装包' }
-        else if (state.phase === 'downloaded') { title.textContent = '安装包已验证'; summary.textContent = 'MSI 已完成签名清单和 SHA-256 校验。'; action.textContent = '在文件夹中显示'; action.disabled = false }
+        else if (state.phase === 'downloaded') { title.textContent = '安装包已验证'; summary.textContent = 'MSI 已完成签名清单和 SHA-256 校验，可以启动安装。'; action.textContent = '启动安装'; action.disabled = false }
+        else if (state.phase === 'installing') { title.textContent = '安装程序已启动'; summary.textContent = '按安装向导完成升级；需要时请先关闭当前 DSH Desktop。'; action.textContent = '打开安装包位置'; action.disabled = false }
+        else if (state.phase === 'dsh-update-available') { title.textContent = '官方 DSH 已更新'; summary.textContent = '新版正在等待桌面端兼容验证，目前不会直接替换本地运行时。'; action.textContent = '再次检查'; action.disabled = false }
         else if (state.phase === 'up-to-date') { title.textContent = '已是最新版本'; summary.textContent = '当前桌面端与已验证的 DSH 版本保持同步。'; action.textContent = '再次检查'; action.disabled = false }
-        else if (state.phase === 'unavailable') { title.textContent = '更新服务尚未启用'; summary.textContent = '发布地址和签名公钥配置完成后，这里会提供安全更新。'; action.textContent = '重新检查'; action.disabled = false }
+        else if (state.phase === 'unavailable') { title.textContent = '桌面端更新尚未启用'; summary.textContent = '已检查官方 DSH；签名发布地址配置后可直接下载安全更新。'; action.textContent = '重新检查'; action.disabled = false }
         else if (state.phase === 'error') { title.textContent = '无法检查更新'; summary.textContent = '本次检查没有更改任何本地文件。'; action.textContent = '重试'; action.disabled = false }
-        else if (state.phase === 'downloading') { title.textContent = '正在下载安装包'; summary.textContent = '下载结束后会先校验完整性，不会自动运行。'; action.textContent = `${Math.round(state.progress || 0)}%` }
-        else { title.textContent = '检查更新'; summary.textContent = '正在读取经过签名的桌面端发布清单。'; action.textContent = '检查更新' }
+        else if (state.phase === 'downloading') { title.textContent = '正在下载安装包'; summary.textContent = '下载结束后会先校验完整性，再由你确认启动安装。'; action.textContent = `${Math.round(state.progress || 0)}%` }
+        else { title.textContent = '检查更新'; summary.textContent = '正在检查官方 DSH 与经过签名的桌面端发布清单。'; action.textContent = '检查更新' }
       }
 
       action.addEventListener('click', async () => {
         const state = await api.status()
         if (state.phase === 'available') await api.download()
-        else if (state.phase === 'downloaded') await api.reveal()
+        else if (state.phase === 'downloaded') await api.install()
+        else if (state.phase === 'installing') await api.reveal()
         else await api.check()
       })
       api.onStatus(render)

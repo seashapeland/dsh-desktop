@@ -665,6 +665,7 @@ if (window.location.protocol === 'file:') {
       status: () => ipcRenderer.invoke('updates:status'),
       check: () => ipcRenderer.invoke('updates:check'),
       download: () => ipcRenderer.invoke('updates:download'),
+      install: () => ipcRenderer.invoke('updates:install'),
       reveal: () => ipcRenderer.invoke('updates:reveal'),
       onStatus: (listener: (state: unknown) => void) => {
         ipcRenderer.on('updates:status', (_event, state) => listener(state))

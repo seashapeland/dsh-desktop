@@ -24,6 +24,11 @@ export type DownloadProgress = {
   percent: number
 }
 
+export type OfficialDshRelease = {
+  version: string
+  packageUrl: string
+}
+
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/
 const SHA256_PATTERN = /^[0-9a-f]{64}$/i
 const BASE64_PATTERN = /^[0-9A-Za-z+/]+={0,2}$/
@@ -81,6 +86,26 @@ export function compareVersions(left: string, right: string): number {
     return a.localeCompare(b)
   }
   return 0
+}
+
+export function parseOfficialDshRelease(value: unknown): OfficialDshRelease {
+  if (!value || typeof value !== 'object') throw new Error('官方 DSH 版本响应格式无效。')
+  const version = requiredString((value as { version?: unknown }).version, 'version', 64)
+  if (!VERSION_PATTERN.test(version)) throw new Error('官方 DSH 版本号无效。')
+  return {
+    version,
+    packageUrl: `https://www.npmjs.com/package/@deepseek-ai/dsh/v/${encodeURIComponent(version)}`
+  }
+}
+
+export async function fetchOfficialDshRelease(): Promise<OfficialDshRelease> {
+  const response = await fetch('https://registry.npmjs.org/@deepseek-ai%2Fdsh/latest', {
+    redirect: 'error',
+    signal: AbortSignal.timeout(10_000),
+    headers: { accept: 'application/json' }
+  })
+  if (!response.ok) throw new Error(`官方 DSH 版本服务返回 HTTP ${response.status}。`)
+  return parseOfficialDshRelease(await response.json())
 }
 
 export function verifyUpdateManifest(value: unknown, publicKey: string): UpdatePayload {

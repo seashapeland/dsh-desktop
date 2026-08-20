@@ -1,12 +1,17 @@
 {
   "name": "dsh-desktop",
-  "version": "0.1.4",
+  "version": "0.1.8",
   "description": "Windows desktop host for DeepSeek Harness",
   "private": true,
   "main": "dist/main/index.js",
   "scripts": {
     "patch:dsh-picker": "node scripts/patch-dsh-directory-picker.mjs",
     "postinstall": "node scripts/patch-dsh-directory-picker.mjs",
+    "runtime:install": "node scripts/install-dsh-runtime.mjs",
+    "runtime:verify": "node scripts/verify-dsh-runtime.mjs",
+    "update:dsh": "node scripts/update-dsh-runtime.mjs",
+    "release:keys": "node scripts/generate-update-keys.mjs",
+    "release:manifest": "node scripts/create-update-manifest.mjs",
     "build": "npm run patch:dsh-picker && tsc -p tsconfig.json",
     "clean": "node scripts/clean.mjs",
     "test:update": "npm run build && node scripts/test-update-manifest.mjs",
@@ -14,46 +19,24 @@
     "preview:safe": "npm run build && node scripts/preview.mjs --isolated",
     "preview:update": "npm run build && node scripts/preview.mjs --isolated --open-update-window",
     "start": "npm run build && electron .",
-    "dist:win": "npm run build && electron-builder --win msi --x64"
+    "dist:win": "npm run build && npm run runtime:verify && electron-builder --win msi --x64 && node scripts/verify-packaged-runtime.mjs"
   },
-  "dependencies": {
-    "@deepseek-ai/cordis": "4.0.1",
-    "@deepseek-ai/cordis-plugin-group": "1.0.1",
-    "@deepseek-ai/cordis-plugin-hmr": "1.0.16",
-    "@deepseek-ai/cordis-plugin-include": "1.0.6",
-    "@deepseek-ai/cordis-plugin-loader": "1.0.2",
-    "@deepseek-ai/dsh": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-anonymous-user-id": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-atomic-write": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-bash-local": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-code-runtime": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-compaction": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-fs": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-home-paths": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-invariants": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-launch-environment": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-output-retention": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-sandbox": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-scope": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-session-telemetry": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-session-title-llm": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-shell": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-spill": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-subagent-in-process-driver": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-subprocess": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-system-prompt": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-timeout": "0.1.0-rc.6",
-    "@deepseek-ai/dsh-workflow": "0.1.0-rc.6"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^22.15.0",
+    "@deepseek-ai/dsh": "0.1.0-rc.7",
     "electron": "^39.0.0",
     "electron-builder": "^26.0.12",
     "typescript": "^5.8.3"
   },
   "desktopUpdate": {
-    "manifestUrl": "",
-    "publicKey": ""
+    "repository": "seashapeland/dsh-desktop",
+    "manifestUrl": "https://github.com/seashapeland/dsh-desktop/releases/latest/download/update.json",
+    "publicKey": "",
+    "publicKeyFile": "build/update-public-key.pem"
+  },
+  "dshRuntime": {
+    "version": "0.1.0-rc.7"
   },
   "build": {
     "appId": "ai.deepseek.dshdesktop",
@@ -66,7 +49,17 @@
     "files": [
       "dist/**/*",
       "src/renderer/**/*",
+      "build/update-public-key.pem",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "runtime/node_modules",
+        "to": "dsh-runtime/node_modules",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "asar": true,
     "npmRebuild": false,

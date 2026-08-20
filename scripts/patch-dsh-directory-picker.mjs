@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { access, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -11,22 +11,10 @@ if (process.platform !== 'win32') {
 }
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const workerPath = path.join(
-  projectRoot,
-  'node_modules',
-  '@deepseek-ai',
-  'dsh-host-directory-picker-native',
-  'lib',
-  'worker.cjs'
-)
-const hostPath = path.join(
-  projectRoot,
-  'node_modules',
-  '@deepseek-ai',
-  'dsh-host-directory-picker-native',
-  'lib',
-  'index.js'
-)
+const moduleRoots = [
+  path.join(projectRoot, 'node_modules'),
+  path.join(projectRoot, 'runtime', 'node_modules')
+]
 
 const vulnerableReadUtf16 = `function readUtf16(koffi, address) {
 \tconst bytes = Buffer.from(koffi.view(address, 32768));
@@ -82,47 +70,59 @@ const patchedExitHandler = `\t\tworker.on("exit", (code, signal) => {
 \t\t\t});
 \t\t});`
 
-let worker = await readFile(workerPath, 'utf8')
-let host = await readFile(hostPath, 'utf8')
-let changed = false
+async function patchRuntime(modulesRoot) {
+  const packageRoot = path.join(modulesRoot, '@deepseek-ai', 'dsh-host-directory-picker-native', 'lib')
+  const workerPath = path.join(packageRoot, 'worker.cjs')
+  const hostPath = path.join(packageRoot, 'index.js')
+  try {
+    await Promise.all([access(workerPath), access(hostPath)])
+  } catch {
+    return false
+  }
 
-if (worker.includes(vulnerableReadUtf16)) {
-  worker = worker.replace(vulnerableReadUtf16, patchedReadUtf16)
-  changed = true
-} else if (!worker.includes(patchedReadUtf16)) {
-  throw new Error(
-    'The DSH directory picker UTF-16 reader no longer matches the rc.6 layout. Review the upstream worker before updating this patch.'
-  )
+  let worker = await readFile(workerPath, 'utf8')
+  let host = await readFile(hostPath, 'utf8')
+  let changed = false
+
+  if (worker.includes(vulnerableReadUtf16)) {
+    worker = worker.replace(vulnerableReadUtf16, patchedReadUtf16)
+    changed = true
+  } else if (!worker.includes(patchedReadUtf16)) {
+    throw new Error(
+      'The DSH directory picker UTF-16 reader no longer matches the supported layout. Review the upstream worker before updating this patch.'
+    )
+  }
+
+  if (worker.includes(vulnerablePost) && worker.includes(doneCall) && worker.includes(errorCall)) {
+    worker = worker
+      .replace(vulnerablePost, patchedPost)
+      .replace(doneCall, patchedDoneCall)
+      .replace(errorCall, patchedErrorCall)
+    changed = true
+  } else if (!worker.includes(patchedPost) || !worker.includes(patchedDoneCall) || !worker.includes(patchedErrorCall)) {
+    throw new Error(
+      'The DSH directory picker worker no longer matches the supported layout. Review the upstream worker before updating this patch.'
+    )
+  }
+
+  if (host.includes(vulnerableExitHandler)) {
+    host = host.replace(vulnerableExitHandler, patchedExitHandler)
+    changed = true
+  } else if (!host.includes(patchedExitHandler)) {
+    throw new Error(
+      'The DSH directory picker host no longer matches the supported layout. Review the upstream host before updating this patch.'
+    )
+  }
+
+  if (changed) {
+    await Promise.all([
+      writeFile(workerPath, worker, 'utf8'),
+      writeFile(hostPath, host, 'utf8')
+    ])
+  }
+  return changed
 }
 
-if (worker.includes(vulnerablePost) && worker.includes(doneCall) && worker.includes(errorCall)) {
-  worker = worker
-    .replace(vulnerablePost, patchedPost)
-    .replace(doneCall, patchedDoneCall)
-    .replace(errorCall, patchedErrorCall)
-  changed = true
-} else if (!worker.includes(patchedPost) || !worker.includes(patchedDoneCall) || !worker.includes(patchedErrorCall)) {
-  throw new Error(
-    'The DSH directory picker worker no longer matches the rc.6 layout. Review the upstream worker before updating this patch.'
-  )
-}
-
-if (host.includes(vulnerableExitHandler)) {
-  host = host.replace(vulnerableExitHandler, patchedExitHandler)
-  changed = true
-} else if (!host.includes(patchedExitHandler)) {
-  throw new Error(
-    'The DSH directory picker host no longer matches the rc.6 layout. Review the upstream host before updating this patch.'
-  )
-}
-
-if (!changed) {
-  console.log('DSH directory picker patches already applied.')
-  process.exit(0)
-}
-
-await Promise.all([
-  writeFile(workerPath, worker, 'utf8'),
-  writeFile(hostPath, host, 'utf8')
-])
-console.log('Patched DSH directory picker IPC lifetime, UTF-16 decoding, and exit diagnostics.')
+const results = await Promise.all(moduleRoots.map(patchRuntime))
+if (results.some(Boolean)) console.log('Patched DSH directory picker IPC lifetime, UTF-16 decoding, and exit diagnostics.')
+else console.log('DSH directory picker patches already applied.')
